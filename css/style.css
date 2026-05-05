@@ -1,0 +1,156 @@
+:root {
+    --primary-blue: #0066cc;
+    --dark-blue: #004d99;
+    --light-blue: #e6f0ff;
+    --success: #28a745;
+    --danger: #dc3545;
+    --warning: #ffc107;
+    --text-dark: #333;
+    --text-light: #666;
+    --border: #e0e0e0;
+    --background: #f5f5f5;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--background);
+    color: var(--text-dark);
+}
+
+.app-container {
+    max-width: 500px;
+    margin: 0 auto;
+    background: white;
+    min-height: 100vh;
+    position: relative;
+}
+
+/* Header */
+.header {
+    background: var(--primary-blue);
+    padding: 20px;
+    color: white;
+}
+
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+/* Logo */
+.logo-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: white;
+    overflow: hidden;
+    border: 2px solid white;
+}
+
+.logo-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Buttons */
+.btn {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 25px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: var(--primary-blue);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--dark-blue);
+}
+
+/* Balance Card */
+.balance-card {
+    background: white;
+    margin: -20px 20px 0;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Network Logos */
+.network-logo {
+    width: 50px;
+    height: 50px;
+    margin: 0 auto 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.network-logo img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* Bottom Navigation */
+.bottom-nav {
+    background: white;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-around;
+    padding: 12px 0;
+    position: fixed;
+    bottom: 0;
+    max-width: 500px;
+    width: 100%;
+}
+
+.nav-item {
+    text-align: center;
+    text-decoration: none;
+    color: #999;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.nav-item.active {
+    color: var(--primary-blue);
+}
+
+/* Transactions */
+.transaction-item {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid var(--border);
+}
+
+.transaction-amount.credit {
+    color: var(--success);
+}
+
+/* Utility Classes */
+.text-center { text-align: center; }
+.mt-20 { margin-top: 20px; }
+.mb-20 { margin-bottom: 20px; }
+.p-20 { padding: 20px; }
