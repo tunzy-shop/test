@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Buy Data - TUNZY SUB 4 YOU</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/theme.css">
+    <meta name="theme-color" content="#0A2540">
+</head>
+<body>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/bigisub-config.js"></script>
+
+    <div class="app-container">
+        <div class="header">
+            <a href="dashboard.html" class="back-btn">←</a>
+            <h1>Buy Data</h1>
+        </div>
+        <div class="container">
+            <div class="balance-info">
+                <span>Your Balance</span>
+                <span id="balanceDisplay">₦0.00</span>
+            </div>
+
+            <div class="section-title">Select Network</div>
+            <div class="network-tabs" id="networkTabs"></div>
+
+            <div class="section-title">Data Type</div>
+            <div class="category-tabs" id="categoryTabs"></div>
+
+            <div class="phone-input">
+                <label>Phone Number</label>
+                <input type="tel" id="phoneNumber" placeholder="08012345678" maxlength="11">
+            </div>
+
+            <div class="section-title">Select Plan</div>
+            <div class="plans-grid" id="plansContainer">
+                <div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div>
+            </div>
+
+            <button class="purchase-btn" id="purchaseBtn" onclick="purchaseData()" disabled>Select a plan</button>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div class="message-box error" id="errorBox"><div class="message-icon">❌</div><div class="message-title">Error</div><div class="message-text" id="errorText"></div><button class="message-btn" onclick="closeError()">OK</button></div>
+    <div class="message-box success" id="successBox"><div class="message-icon">✅</div><div class="message-title">Success</div><div class="message-text" id="successText"></div><button class="message-btn" onclick="closeSuccess()">OK</button></div>
+    <div class="message-box pending" id="pendingBox"><div class="message-icon"><span class="spinner dark"></span></div><div class="message-title">Processing</div><div class="message-text" id="pendingText">Please wait...</div></div>
+
+    <script>
+        let allPlans = [];
+        let currentNetwork = NETWORKS[0];
+        let currentCategory = 'ALL';
+        let categories = ['ALL'];
+        let selected = null;
+        let userBalance = 0;
+
+        if (typeof auth !== 'undefined') {
+            auth.onAuthStateChanged((user) => { if (!user) window.location.href = 'login-page.html'; else init(); });
+        } else { init(); }
+
+        async function init() {
+            userBalance = parseFloat(localStorage.getItem('userBalance')) || 0;
+            document.getElementById('balanceDisplay').innerText = fmt(userBalance);
+            renderNetworks();
+            await loadPlans();
+        }
+
+        function renderNetworks() {
+            document.getElementById('networkTabs').innerHTML = NETWORKS.map(n => `
+                <div class="network-tab ${n.id === currentNetwork.id ? 'active' : ''}" data-net="${n.id}">
+                    <div class="network-logo-box"><img src="${n.image}" alt="${n.name}" onerror="this.src='https://via.placeholder.com/60/2563EB/ffffff?text=${n.name.charAt(0)}'"></div>
+                    <span class="network-name">${n.name}</span>
+                </div>`).join('');
+            document.querySelectorAll('.network-tab').forEach(el => {
+                el.addEventListener('click', () => switchNetwork(el.dataset.net));
+            });
+        }
+
+        async function loadPlans() {
+            const container = document.getElementById('plansContainer');
+            container.innerHTML = `<div class="skeleton skeleton-card"></div>`.repeat(6);
+            const res = await bigisubRequest(BIGISUB_ENDPOINTS.DATA_PLANS);
+            if (!res.success || !Array.isArray(res.data)) {
+                container.innerHTML = `<div class="empty-state" style="grid-column:1/-1">Could not load plans. Pull down to retry.</div>`;
+                return;
+            }
+            allPlans = res.data.filter(p => !p.plan_disabled);
+            renderCategories();
+            renderPlans();
+        }
+
+        function switchNetwork(id) {
+            currentNetwork = NETWORKS.find(n => n.id === id) || NETWORKS[0];
+            currentCategory = 'ALL';
+            selected = null;
+            updateBuyBtn();
+            document.querySelectorAll('.network-tab').forEach(t => t.classList.toggle('active', t.dataset.net === id));
+            renderCategories();
+            renderPlans();
+        }
+
+        function renderCategories() {
+            const set = new Set(['ALL']);
+            allPlans.filter(p => p.network === currentNetwork.networkId).forEach(p => set.add(p.plantype));
+            categories = [...set];
+            document.getElementById('categoryTabs').innerHTML = categories.map(c =>
+                `<span class="category-tab ${c === currentCategory ? 'active' : ''}" data-cat="${c}">${c}</span>`
+            ).join('');
+            document.querySelectorAll('.category-tab').forEach(el => {
+                el.addEventListener('click', () => { currentCategory = el.dataset.cat; renderCategories(); renderPlans(); });
+            });
+        }
+
+        function renderPlans() {
+            const container = document.getElementById('plansContainer');
+            let plans = allPlans.filter(p => p.network === currentNetwork.networkId);
+            if (currentCategory !== 'ALL') plans = plans.filter(p => p.plantype === currentCategory);
+            plans.sort((a,b) => a.amount - b.amount);
+            if (!plans.length) {
+                container.innerHTML = `<div class="empty-state" style="grid-column:1/-1">No plans available for ${currentNetwork.name}.</div>`;
+                return;
+            }
+            container.innerHTML = plans.map(p => {
+                const price = withMargin(p.amount);
+                return `<div class="plan-card" data-id="${p.id}" data-price="${price}" data-name="${p.size}${p.plan_volume}">
+                    <div class="plan-name">${p.size}${p.plan_volume}</div>
+                    <div class="plan-price">${fmt(price)}</div>
+                    <div class="plan-validity">${p.validity}</div>
+                </div>`;
+            }).join('');
+            document.querySelectorAll('.plan-card').forEach(el => {
+                el.addEventListener('click', () => selectPlan(el));
+            });
+        }
+
+        function selectPlan(el) {
+            document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            selected = { id: +el.dataset.id, price: +el.dataset.price, name: el.dataset.name };
+            updateBuyBtn();
+        }
+
+        function updateBuyBtn() {
+            const btn = document.getElementById('purchaseBtn');
+            if (!selected) { btn.disabled = true; btn.innerText = 'Select a plan'; }
+            else { btn.disabled = false; btn.innerText = `Pay ${fmt(selected.price)}`; }
+        }
+
+        async function purchaseData() {
+            const phone = document.getElementById('phoneNumber').value.trim();
+            if (!selected) return showError('Select a plan');
+            if (!/^0\d{10}$/.test(phone)) return showError('Enter valid 11-digit phone number');
+            if (userBalance < selected.price) return showError('Insufficient balance. Please fund your wallet.');
+
+            const btn = document.getElementById('purchaseBtn');
+            btn.classList.add('btn-loading');
+            btn.innerHTML = '<span class="spinner"></span> Processing...';
+            showPending('Sending data to ' + phone + '...');
+
+            const payload = { network: currentNetwork.networkId, plan: selected.id, phone_number: phone, pin_code: BIGISUB_CONFIG.PIN_CODE };
+            const res = await bigisubRequest(BIGISUB_ENDPOINTS.DATA_PURCHASE, 'POST', payload);
+            hidePending();
+            btn.classList.remove('btn-loading');
+
+            if (res.success) {
+                userBalance -= selected.price;
+                localStorage.setItem('userBalance', userBalance);
+                document.getElementById('balanceDisplay').innerText = fmt(userBalance);
+                logTx({ type: `Data ${selected.name} - ${currentNetwork.name}`, amount: `-${fmt(selected.price)}`, ref: res.data?.reference });
+                showSuccess(`${selected.name} sent to ${phone}`);
+            } else {
+                updateBuyBtn();
+                showError(extractErr(res));
+            }
+        }
+
+        function extractErr(r) {
+            if (r.errors) { const v = Object.values(r.errors); if (v.length) return Array.isArray(v[0]) ? v[0][0] : v[0]; }
+            return r.message || 'Purchase failed';
+        }
+        function logTx(tx) {
+            const arr = JSON.parse(localStorage.getItem('transactions') || '[]');
+            arr.unshift({ ...tx, date: new Date().toLocaleString() });
+            localStorage.setItem('transactions', JSON.stringify(arr.slice(0,30)));
+        }
+        function showError(m){document.getElementById('errorText').innerText=m;document.getElementById('overlay').style.display='block';document.getElementById('errorBox').style.display='flex';}
+        function closeError(){document.getElementById('overlay').style.display='none';document.getElementById('errorBox').style.display='none';}
+        function showSuccess(m){document.getElementById('successText').innerText=m;document.getElementById('overlay').style.display='block';document.getElementById('successBox').style.display='flex';setTimeout(()=>{closeSuccess();window.location.href='dashboard.html';},2000);}
+        function closeSuccess(){document.getElementById('overlay').style.display='none';document.getElementById('successBox').style.display='none';}
+        function showPending(m){document.getElementById('pendingText').innerText=m;document.getElementById('overlay').style.display='block';document.getElementById('pendingBox').style.display='flex';}
+        function hidePending(){document.getElementById('overlay').style.display='none';document.getElementById('pendingBox').style.display='none';}
+    </script>
+</body>
+</html>

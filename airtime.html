@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Airtime - TUNZY SUB 4 YOU</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/theme.css">
+    <meta name="theme-color" content="#0A2540">
+</head>
+<body>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/bigisub-config.js"></script>
+
+    <div class="app-container">
+        <div class="header">
+            <a href="dashboard.html" class="back-btn">←</a>
+            <h1>Airtime Top-up</h1>
+        </div>
+        <div class="container">
+            <div class="balance-info"><span>Your Balance</span><span id="balanceDisplay">₦0.00</span></div>
+
+            <div class="section-title">Select Network</div>
+            <div class="network-tabs" id="networkTabs"></div>
+
+            <div class="phone-input">
+                <label>Phone Number</label>
+                <input type="tel" id="phoneNumber" placeholder="08012345678" maxlength="11">
+            </div>
+
+            <div class="section-title">Select Amount</div>
+            <div class="amount-presets" id="amountPresets" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0"></div>
+
+            <div class="custom-amount">
+                <label>Or enter custom amount</label>
+                <input type="number" id="customAmount" placeholder="Min ₦50 - Max ₦50,000" min="50" max="50000">
+            </div>
+
+            <button class="purchase-btn" id="purchaseBtn" onclick="purchaseAirtime()" disabled>Select amount</button>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div class="message-box error" id="errorBox"><div class="message-icon">❌</div><div class="message-title">Error</div><div class="message-text" id="errorText"></div><button class="message-btn" onclick="closeError()">OK</button></div>
+    <div class="message-box success" id="successBox"><div class="message-icon">✅</div><div class="message-title">Success</div><div class="message-text" id="successText"></div><button class="message-btn" onclick="closeSuccess()">OK</button></div>
+    <div class="message-box pending" id="pendingBox"><div class="message-icon"><span class="spinner dark"></span></div><div class="message-title">Processing</div><div class="message-text" id="pendingText">Please wait...</div></div>
+
+    <script>
+        let currentNetwork = NETWORKS[0];
+        let amount = 0;
+        let userBalance = 0;
+        const PRESETS = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
+
+        if (typeof auth !== 'undefined') {
+            auth.onAuthStateChanged(u => { if (!u) location.href='login-page.html'; else init(); });
+        } else { init(); }
+
+        function init() {
+            userBalance = parseFloat(localStorage.getItem('userBalance')) || 0;
+            document.getElementById('balanceDisplay').innerText = fmt(userBalance);
+            renderNetworks();
+            renderPresets();
+            document.getElementById('customAmount').addEventListener('input', e => {
+                const v = parseInt(e.target.value);
+                amount = v >= 50 ? v : 0;
+                document.querySelectorAll('.amount-btn').forEach(b => b.classList.remove('selected'));
+                updateBtn();
+            });
+        }
+
+        function renderNetworks() {
+            document.getElementById('networkTabs').innerHTML = NETWORKS.map(n => `
+                <div class="network-tab ${n.id === currentNetwork.id ? 'active' : ''}" data-net="${n.id}">
+                    <div class="network-logo-box"><img src="${n.image}" alt="${n.name}" onerror="this.src='https://via.placeholder.com/60/2563EB/ffffff?text=${n.name.charAt(0)}'"></div>
+                    <span class="network-name">${n.name}</span>
+                </div>`).join('');
+            document.querySelectorAll('.network-tab').forEach(el =>
+                el.addEventListener('click', () => {
+                    currentNetwork = NETWORKS.find(n => n.id === el.dataset.net);
+                    document.querySelectorAll('.network-tab').forEach(t => t.classList.toggle('active', t === el));
+                }));
+        }
+
+        function renderPresets() {
+            document.getElementById('amountPresets').innerHTML = PRESETS.map(a =>
+                `<div class="amount-btn plan-card" data-amt="${a}" style="padding:14px 8px">
+                    <div class="plan-price" style="font-size:16px">${fmt(a)}</div>
+                </div>`).join('');
+            document.querySelectorAll('.amount-btn').forEach(el =>
+                el.addEventListener('click', () => {
+                    amount = +el.dataset.amt;
+                    document.getElementById('customAmount').value = amount;
+                    document.querySelectorAll('.amount-btn').forEach(b => b.classList.toggle('selected', b === el));
+                    updateBtn();
+                }));
+        }
+
+        function updateBtn() {
+            const btn = document.getElementById('purchaseBtn');
+            if (amount >= 50) { btn.disabled = false; btn.innerText = `Pay ${fmt(amount)}`; }
+            else { btn.disabled = true; btn.innerText = 'Select amount'; }
+        }
+
+        async function purchaseAirtime() {
+            const phone = document.getElementById('phoneNumber').value.trim();
+            if (amount < 50) return showError('Minimum airtime is ₦50');
+            if (!/^0\d{10}$/.test(phone)) return showError('Enter valid 11-digit phone number');
+            if (userBalance < amount) return showError('Insufficient balance');
+
+            const btn = document.getElementById('purchaseBtn');
+            btn.classList.add('btn-loading');
+            btn.innerHTML = '<span class="spinner"></span> Processing...';
+            showPending(`Sending ${fmt(amount)} airtime to ${phone}...`);
+
+            const payload = { network: currentNetwork.networkId, phone_number: phone, amount: amount.toString(), airtime_type: 'vtu', pin: BIGISUB_CONFIG.PIN_CODE };
+            const res = await bigisubRequest(BIGISUB_ENDPOINTS.AIRTIME_PURCHASE, 'POST', payload);
+            hidePending();
+            btn.classList.remove('btn-loading');
+
+            if (res.success) {
+                userBalance -= amount;
+                localStorage.setItem('userBalance', userBalance);
+                document.getElementById('balanceDisplay').innerText = fmt(userBalance);
+                const arr = JSON.parse(localStorage.getItem('transactions') || '[]');
+                arr.unshift({ type: `Airtime ${currentNetwork.name} - ${fmt(amount)}`, amount: `-${fmt(amount)}`, date: new Date().toLocaleString(), ref: res.data?.reference });
+                localStorage.setItem('transactions', JSON.stringify(arr.slice(0, 30)));
+                showSuccess(`${fmt(amount)} airtime sent to ${phone}`);
+            } else {
+                updateBtn();
+                showError(extractErr(res));
+            }
+        }
+        function extractErr(r){if(r.errors){const v=Object.values(r.errors);if(v.length)return Array.isArray(v[0])?v[0][0]:v[0];}return r.message||'Purchase failed';}
+        function showError(m){document.getElementById('errorText').innerText=m;document.getElementById('overlay').style.display='block';document.getElementById('errorBox').style.display='flex';}
+        function closeError(){document.getElementById('overlay').style.display='none';document.getElementById('errorBox').style.display='none';}
+        function showSuccess(m){document.getElementById('successText').innerText=m;document.getElementById('overlay').style.display='block';document.getElementById('successBox').style.display='flex';setTimeout(()=>{closeSuccess();location.href='dashboard.html';},2000);}
+        function closeSuccess(){document.getElementById('overlay').style.display='none';document.getElementById('successBox').style.display='none';}
+        function showPending(m){document.getElementById('pendingText').innerText=m;document.getElementById('overlay').style.display='block';document.getElementById('pendingBox').style.display='flex';}
+        function hidePending(){document.getElementById('overlay').style.display='none';document.getElementById('pendingBox').style.display='none';}
+    </script>
+</body>
+</html>

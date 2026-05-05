@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - TUNZY SUB 4 YOU</title>
+    
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<meta name="theme-color" content="#0A2540">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="logo">
+                <div class="logo-circle">
+                    <img src="assets/my-logo.jpg" alt="TUNZY" onerror="this.src='https://via.placeholder.com/80/0066cc/ffffff?text=T'">
+                </div>
+                <h1>TUNZY SUB 4 YOU</h1>
+                <p>Sign in to your account</p>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="email" placeholder="you@example.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="********" required>
+                </div>
+
+                <div class="forgot-password">
+                    <a href="#" onclick="showResetModal()">Forgot Password?</a>
+                </div>
+
+                <button type="submit" class="login-btn">Sign In</button>
+
+                <div class="signup-link">
+                    Don't have an account? <a href="signup.html">Create Account</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Password Reset Modal -->
+    <div id="resetModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000;">
+        <div style="background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 350px;">
+            <h3 style="margin-bottom: 15px; color: #333;">Reset Password</h3>
+            <p style="margin-bottom: 20px; color: #666; font-size: 14px;">Enter your email to receive reset instructions</p>
+            
+            <input type="email" id="resetEmail" placeholder="Your email address" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 20px;">
+            
+            <div style="display: flex; gap: 10px;">
+                <button onclick="hideResetModal()" style="flex: 1; padding: 12px; background: #f5f5f5; border: none; border-radius: 8px; cursor: pointer;">Cancel</button>
+                <button onclick="resetPassword()" style="flex: 1; padding: 12px; background: #0066cc; color: white; border: none; border-radius: 8px; cursor: pointer;">Send Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // SIMPLE LOGIN - NO ADMIN, JUST USERS!
+        // ============================================
+
+        // Check if already logged in
+        (function() {
+            const currentUser = localStorage.getItem('currentUser');
+            if (currentUser) {
+                window.location.replace('index.html');
+                return;
+            }
+        })();
+
+        // Handle login
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            // Clear previous messages
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'none';
+            
+            // Get users from localStorage
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            
+            // Find user
+            const user = users.find(u => u.email === email && u.password === password);
+            
+            if (user) {
+                // Login successful
+                document.getElementById('successMessage').style.display = 'block';
+                document.getElementById('successMessage').textContent = 'Login successful! Redirecting...';
+                
+                // Save current user
+                localStorage.setItem('currentUser', JSON.stringify({
+                    email: user.email,
+                    name: user.name
+                }));
+                
+                // Save user data for app
+                localStorage.setItem('userName', user.name);
+                localStorage.setItem('userEmail', user.email);
+                localStorage.setItem('userBalance', user.balance || '0');
+                
+                // Redirect to main app
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1500);
+            } else {
+                // Login failed
+                document.getElementById('errorMessage').style.display = 'block';
+                document.getElementById('errorMessage').textContent = 'Invalid email or password';
+                document.getElementById('password').value = '';
+            }
+        });
+
+        // Password reset functions
+        function showResetModal() {
+            document.getElementById('resetModal').style.display = 'flex';
+        }
+
+        function hideResetModal() {
+            document.getElementById('resetModal').style.display = 'none';
+            document.getElementById('resetEmail').value = '';
+        }
+
+        function resetPassword() {
+            const email = document.getElementById('resetEmail').value;
+            
+            if (!email) {
+                alert('Please enter your email');
+                return;
+            }
+            
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            const user = users.find(u => u.email === email);
+            
+            if (user) {
+                alert(`✅ Password reset link sent to ${email}`);
+                hideResetModal();
+            } else {
+                alert('❌ Email not found');
+            }
+        }
+
+        // Allow Enter key
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+            }
+        });
+    </script>
+</body>
+</html>

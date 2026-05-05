@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome - TUNZY SUB 4 YOU</title>
+    
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<meta name="theme-color" content="#0A2540">
+</head>
+<body>
+    <script>
+        // CHECK IF USER IS ALREADY LOGGED IN
+        (function() {
+            const currentUser = localStorage.getItem('currentUser');
+            if (currentUser) {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+        })();
+    </script>
+
+    <div class="slider-container">
+        <div class="logo-circle">
+            <img src="assets/my-logo.jpg" alt="TUNZY" onerror="this.src='https://via.placeholder.com/50/0066cc/ffffff?text=T'">
+        </div>
+
+        <a href="login-page.html" class="skip-btn">Skip →</a>
+
+        <div class="slides" id="slides">
+            <div class="slide">
+                <img src="assets/firstimage.jpg" alt="Welcome" onerror="this.src='https://via.placeholder.com/400x600/0066cc/ffffff?text=Welcome+to+TUNZY'">
+                <div class="slide-overlay">
+                    <h2>Welcome to TUNZY SUB 4 YOU</h2>
+                    <p>Your one-stop platform for all digital subscriptions</p>
+                </div>
+            </div>
+
+            <div class="slide">
+                <img src="assets/secondimage.jpg" alt="Buy Data" onerror="this.src='https://via.placeholder.com/400x600/004d99/ffffff?text=Buy+Data+and+Airtime'">
+                <div class="slide-overlay">
+                    <h2>Buy Data & Airtime</h2>
+                    <p>MTN, GLO, Airtel, 9mobile at the best rates</p>
+                </div>
+            </div>
+
+            <div class="slide">
+                <img src="assets/thirdimage.jpg" alt="Pay Bills" onerror="this.src='https://via.placeholder.com/400x600/003366/ffffff?text=Pay+Your+Bills'">
+                <div class="slide-overlay">
+                    <h2>Pay Bills Easily</h2>
+                    <p>Electricity, Cable TV, Results and more</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="nav-btn prev-btn" onclick="prevSlide()" id="prevBtn">‹</div>
+        <div class="nav-btn next-btn" onclick="nextSlide()" id="nextBtn">›</div>
+
+        <div class="dots-container" id="dotsContainer">
+            <span class="dot active" onclick="goToSlide(0)"></span>
+            <span class="dot" onclick="goToSlide(1)"></span>
+            <span class="dot" onclick="goToSlide(2)"></span>
+        </div>
+
+        <a href="login-page.html" class="login-now-btn">Get Started Now</a>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.getElementById('slides');
+        const totalSlides = 3;
+        const dots = document.querySelectorAll('.dot');
+
+        function updateSlider() {
+            slides.style.transform = `translateX(-${currentSlide * 100}%)`;
+            
+            dots.forEach((dot, index) => {
+                if (index === currentSlide) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                currentSlide++;
+                updateSlider();
+            } else {
+                window.location.href = 'login-page.html';
+                return;
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                updateSlider();
+            }
+        }
+
+        function goToSlide(index) {
+            currentSlide = index;
+            updateSlider();
+        }
+
+        let autoSlide = setInterval(() => {
+            if (currentSlide < totalSlides - 1) {
+                currentSlide++;
+                updateSlider();
+            } else {
+                clearInterval(autoSlide);
+            }
+        }, 3000);
+
+        document.querySelector('.slider-container').addEventListener('mouseenter', () => {
+            clearInterval(autoSlide);
+        });
+
+        document.querySelector('.slider-container').addEventListener('mouseleave', () => {
+            autoSlide = setInterval(() => {
+                if (currentSlide < totalSlides - 1) {
+                    currentSlide++;
+                    updateSlider();
+                } else {
+                    clearInterval(autoSlide);
+                }
+            }, 3000);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                prevSlide();
+            } else if (e.key === 'ArrowRight') {
+                nextSlide();
+            }
+        });
+    </script>
+</body>
+</html>

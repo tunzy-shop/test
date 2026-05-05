@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Cable TV - TUNZY SUB 4 YOU</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/theme.css">
+    <meta name="theme-color" content="#0A2540">
+</head>
+<body>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/bigisub-config.js"></script>
+
+    <div class="app-container">
+        <div class="header"><a href="dashboard.html" class="back-btn">←</a><h1>Cable TV</h1></div>
+        <div class="container">
+            <div class="balance-info"><span>Your Balance</span><span id="balanceDisplay">₦0.00</span></div>
+
+            <div class="section-title">Provider</div>
+            <div class="provider-tabs" id="providerTabs">
+                <div class="skeleton" style="height:46px;flex:1"></div>
+                <div class="skeleton" style="height:46px;flex:1"></div>
+                <div class="skeleton" style="height:46px;flex:1"></div>
+            </div>
+
+            <div class="input-field">
+                <label>Smart Card / IUC Number</label>
+                <input type="text" id="cardNumber" placeholder="Enter card number" inputmode="numeric">
+                <div class="verify-status" id="verifyStatus" style="display:none"></div>
+            </div>
+
+            <div class="customer-info" id="customerInfo" style="display:none;background:var(--surface-2);border:1px solid var(--border);padding:12px 14px;border-radius:var(--radius);margin:10px 0">
+                <p><strong style="color:var(--primary-600)">Customer:</strong> <span id="customerName"></span></p>
+            </div>
+
+            <div class="section-title">Select Package</div>
+            <div class="plans-grid" id="plansContainer">
+                <div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div>
+            </div>
+
+            <button class="purchase-btn" id="purchaseBtn" onclick="subscribeTV()" disabled>Select a package</button>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div class="message-box error" id="errorBox"><div class="message-icon">❌</div><div class="message-title">Error</div><div class="message-text" id="errorText"></div><button class="message-btn" onclick="closeError()">OK</button></div>
+    <div class="message-box success" id="successBox"><div class="message-icon">✅</div><div class="message-title">Success</div><div class="message-text" id="successText"></div><button class="message-btn" onclick="closeSuccess()">OK</button></div>
+    <div class="message-box pending" id="pendingBox"><div class="message-icon"><span class="spinner dark"></span></div><div class="message-title">Processing</div><div class="message-text" id="pendingText">Please wait...</div></div>
+
+    <script>
+        let providers = [];
+        let currentProvider = null;
+        let selected = null;
+        let verified = null;
+        let userBalance = 0;
+        let verifying = false;
+
+        if (typeof auth !== 'undefined') auth.onAuthStateChanged(u => { if (!u) location.href='login-page.html'; else init(); });
+        else init();
+
+        async function init() {
+            userBalance = parseFloat(localStorage.getItem('userBalance')) || 0;
+            document.getElementById('balanceDisplay').innerText = fmt(userBalance);
+            await loadPricing();
+            document.getElementById('cardNumber').addEventListener('blur', verifyCard);
+        }
+
+        async function loadPricing() {
+            const res = await bigisubRequest(BIGISUB_ENDPOINTS.CABLE_PRICING);
+            if (!res.success || !res.data?.providers) {
+                document.getElementById('providerTabs').innerHTML = `<div class="empty-state" style="flex:1">Could not load providers.</div>`;
+                document.getElementById('plansContainer').innerHTML = '';
+                return;
+            }
+            providers = res.data.providers;
+            currentProvider = providers[0];
+            renderProviders();
+            renderPlans();
+        }
+
+        function renderProviders() {
+            document.getElementById('providerTabs').innerHTML = providers.map(p => `
+                <div class="provider-tab ${p.provider_code === currentProvider.provider_code ? 'active' : ''}" data-code="${p.provider_code}">${p.provider}</div>
+            `).join('');
+            document.querySelectorAll('.provider-tab').forEach(el => el.addEventListener('click', () => {
+                currentProvider = providers.find(p => p.provider_code === el.dataset.code);
+                document.querySelectorAll('.provider-tab').forEach(t => t.classList.toggle('active', t === el));
+                selected = null;
+                verified = null;
+                document.getElementById('customerInfo').style.display = 'none';
+                document.getElementById('verifyStatus').style.display = 'none';
+                renderPlans();
+                updateBtn();
+            }));
+        }
+
+        function renderPlans() {
+            const plans = currentProvider.plans || [];
+            const grid = document.getElementById('plansContainer');
+            if (!plans.length) { grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">No packages available.</div>`; return; }
+            grid.innerHTML = plans.map(p => {
+                const price = withMargin(p.amount);
+                return `<div class="plan-card" data-code="${p.code}" data-price="${price}" data-amt="${p.amount}" data-name="${p.name.replace(/"/g,'&quot;')}">
+                    <div class="plan-name" style="font-size:13px;line-height:1.3">${p.name}</div>
+                    <div class="plan-price">${fmt(price)}</div>
+                    <div class="plan-validity">${p.duration || ''}</div>
+                </div>`;
+            }).join('');
+            document.querySelectorAll('.plan-card').forEach(el => el.addEventListener('click', () => {
+                document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+                el.classList.add('selected');
+                selected = { code: el.dataset.code, price: +el.dataset.price, amount: +el.dataset.amt, name: el.dataset.name };
+                updateBtn();
+            }));
+        }
+
+        async function verifyCard() {
+            const card = document.getElementById('cardNumber').value.trim();
+            if (!card || card.length < 6 || !currentProvider || verifying) return;
+            verifying = true;
+            const status = document.getElementById('verifyStatus');
+            status.style.display = 'flex';
+            status.className = 'verify-status';
+            status.innerHTML = '<span class="spinner dark"></span> Verifying card...';
+
+            const res = await bigisubRequest(BIGISUB_ENDPOINTS.CABLE_VERIFY, 'POST', {
+                cable_name: currentProvider.provider_code, smart_card_number: card
+            });
+            verifying = false;
+            if (res.success && res.data) {
+                verified = res.data;
+                document.getElementById('customerName').innerText = res.data.customer_name || res.data.Customer_Name || res.data.customer || 'Verified';
+                document.getElementById('customerInfo').style.display = 'block';
+                status.className = 'verify-status ok';
+                status.innerHTML = '✓ Verified';
+            } else {
+                verified = null;
+                document.getElementById('customerInfo').style.display = 'none';
+                status.className = 'verify-status err';
+                status.innerHTML = '✕ ' + (res.message || 'Could not verify card');
+            }
+            updateBtn();
+        }
+
+        function updateBtn() {
+            const card = document.getElementById('cardNumber').value.trim();
+            const btn = document.getElementById('purchaseBtn');
+            if (selected && verified && card.length >= 6) {
+                btn.disabled = false;
+                btn.innerText = `Pay ${fmt(selected.price)}`;
+            } else {
+                btn.disabled = true;
+                btn.innerText = !selected ? 'Select a package' : (!verified ? 'Verify card to continue' : 'Enter card number');
+            }
+        }
+
+        async function subscribeTV() {
+            const card = document.getElementById('cardNumber').value.trim();
+            if (!selected || !verified) return showError('Complete the form');
+            if (userBalance < selected.price) return showError('Insufficient balance');
+
+            const btn = document.getElementById('purchaseBtn');
+            btn.classList.add('btn-loading');
+            btn.innerHTML = '<span class="spinner"></span> Processing...';
+            showPending('Subscribing...');
+
+            const payload = {
+                cable_name: currentProvider.provider_code,
+                smart_card_number: card,
+                cable_plan: selected.code,
+                customer_name: verified.customer_name || verified.Customer_Name || verified.customer || '',
+                pin_code: BIGISUB_CONFIG.PIN_CODE
+            };
+            const res = await bigisubRequest(BIGISUB_ENDPOINTS.CABLE_PURCHASE, 'POST', payload);
+            hidePending();
+            btn.classList.remove('btn-loading');
+
+            if (res.success) {
+                userBalance -= selected.price;
+                localStorage.setItem('userBalance', userBalance);
+                document.getElementById('balanceDisplay').innerText = fmt(userBalance);
+                const arr = JSON.parse(localStorage.getItem('transactions') || '[]');
+                arr.unshift({ type: `${currentProvider.provider} - ${selected.name}`, amount: `-${fmt(selected.price)}`, date: new Date().toLocaleString(), card });
+                localStorage.setItem('transactions', JSON.stringify(arr.slice(0, 30)));
+                showSuccess(`${selected.name} activated on ${card}`);
+            } else {
+                updateBtn();
+                showError(res.message || 'Subscription failed');
+            }
+        }
+        function showError(m){document.getElementById('errorText').innerText=m;document.getElementById('overlay').style.display='block';document.getElementById('errorBox').style.display='flex';}
+        function closeError(){document.getElementById('overlay').style.display='none';document.getElementById('errorBox').style.display='none';}
+        function showSuccess(m){document.getElementById('successText').innerText=m;document.getElementById('overlay').style.display='block';document.getElementById('successBox').style.display='flex';setTimeout(()=>{closeSuccess();location.href='dashboard.html';},2200);}
+        function closeSuccess(){document.getElementById('overlay').style.display='none';document.getElementById('successBox').style.display='none';}
+        function showPending(m){document.getElementById('pendingText').innerText=m;document.getElementById('overlay').style.display='block';document.getElementById('pendingBox').style.display='flex';}
+        function hidePending(){document.getElementById('overlay').style.display='none';document.getElementById('pendingBox').style.display='none';}
+    </script>
+</body>
+</html>

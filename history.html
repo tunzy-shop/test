@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>History - TUNZY SUB 4 YOU</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<meta name="theme-color" content="#0A2540">
+</head>
+<body>
+    <script src="js/firebase-config.js"></script>
+    <div class="app-container">
+        <div class="header">
+            <a href="dashboard.html" class="back-btn">←</a>
+            <h1>Transaction History</h1>
+        </div>
+        <div class="filter-tabs">
+            <span class="filter-tab active" onclick="filterTransactions('all')">All</span>
+            <span class="filter-tab" onclick="filterTransactions('credit')">Credits</span>
+            <span class="filter-tab" onclick="filterTransactions('debit')">Debits</span>
+        </div>
+        <div class="transactions-list" id="transactionsList"></div>
+    </div>
+    <div class="bottom-nav">
+        <a href="dashboard.html" class="nav-item">
+            <div class="nav-icon"><img src="assets/icons/home-icon.png" alt="Home"></div>
+            <div>HOME</div>
+        </a>
+        <a href="history.html" class="nav-item active">
+            <div class="nav-icon"><img src="assets/icons/history-icon.png" alt="History"></div>
+            <div>HISTORY</div>
+        </a>
+        <a href="support.html" class="nav-item">
+            <div class="nav-icon"><img src="assets/icons/support-icon.png" alt="Support"></div>
+            <div>SUPPORT</div>
+        </a>
+        <a href="profile.html" class="nav-item">
+            <div class="nav-icon"><img src="assets/icons/profile-icon.png" alt="Profile"></div>
+            <div>PROFILE</div>
+        </a>
+    </div>
+    <script>
+        let allTransactions = [];
+        auth.onAuthStateChanged((user) => { if (!user) window.location.href = 'login-page.html'; else loadTransactions(); });
+
+        function loadTransactions() {
+            allTransactions = JSON.parse(localStorage.getItem('transactions')) || [];
+            displayTransactions('all');
+        }
+
+        function displayTransactions(filter) {
+            let filtered = allTransactions;
+            if (filter === 'credit') filtered = allTransactions.filter(t => t.amount && t.amount.startsWith('+'));
+            else if (filter === 'debit') filtered = allTransactions.filter(t => t.amount && t.amount.startsWith('-'));
+            let container = document.getElementById('transactionsList');
+            if (filtered.length === 0) { container.innerHTML = '<div class="empty-state">No transactions</div>'; return; }
+            let html = '';
+            filtered.forEach(t => {
+                let isCredit = t.amount && t.amount.startsWith('+');
+                html += `<div class="transaction-item"><div><div class="transaction-service">${t.type}</div><div class="transaction-date">${t.date}</div></div><div class="transaction-amount ${isCredit ? 'credit' : ''}">${t.amount}</div></div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function filterTransactions(filter) {
+            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            displayTransactions(filter);
+        }
+    </script>
+</body>
+</html>

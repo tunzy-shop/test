@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fund Wallet - TUNZY SUB 4 YOU</title>
+    
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<meta name="theme-color" content="#0A2540">
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <a href="dashboard.html" class="back-btn">←</a>
+            <h1>Fund Wallet</h1>
+        </div>
+
+        <div class="fund-container">
+            <div class="balance-display">
+                <div class="current-balance">Current Balance</div>
+                <div class="balance-amount" id="balanceDisplay">₦0.00</div>
+            </div>
+
+            <!-- Fee Information -->
+            <div class="fee-summary" id="feeSummary" style="display: none;">
+                <div class="fee-row">
+                    <span class="amount-label">Amount you want:</span>
+                    <span class="amount-value" id="displayAmount">₦0</span>
+                </div>
+                <div class="fee-row">
+                    <span class="amount-label">Service Fee (fixed ₦10):</span>
+                    <span class="fee-value" id="displayFee">₦10</span>
+                </div>
+                <div class="fee-row total">
+                    <span>Total to pay:</span>
+                    <span class="total-value" id="displayTotal">₦10</span>
+                </div>
+                <div class="fee-row" style="margin-top: 10px; color: #28a745;">
+                    <span>You will receive in wallet:</span>
+                    <span id="displayReceive">₦0</span>
+                </div>
+            </div>
+
+            <div class="amount-grid">
+                <button class="amount-btn" onclick="selectAmount(100)">₦100</button>
+                <button class="amount-btn" onclick="selectAmount(200)">₦200</button>
+                <button class="amount-btn" onclick="selectAmount(500)">₦500</button>
+                <button class="amount-btn" onclick="selectAmount(1000)">₦1,000</button>
+                <button class="amount-btn" onclick="selectAmount(2000)">₦2,000</button>
+                <button class="amount-btn" onclick="selectAmount(5000)">₦5,000</button>
+                <button class="amount-btn" onclick="selectAmount(10000)">₦10,000</button>
+                <button class="amount-btn" onclick="selectAmount(20000)">₦20,000</button>
+                <button class="amount-btn" onclick="selectAmount(50000)">₦50,000</button>
+            </div>
+
+            <div class="custom-amount">
+                <label>Or enter custom amount</label>
+                <input type="number" id="customAmount" placeholder="Enter amount" min="100" oninput="updateAmount()">
+            </div>
+
+            <button class="fund-btn" id="fundBtn" onclick="processPayment()" disabled>Select amount</button>
+
+            <div class="note">🔒 Secured by Paystack</div>
+        </div>
+    </div>
+
+    <script>
+        // Paystack Public Key (REPLACE WITH YOUR ACTUAL KEY)
+        const PAYSTACK_PUBLIC_KEY = 'pk_live_ad349049b1c39f9376a000aaf8c0ad81a914c984';
+        
+        // Fixed fee
+        const SERVICE_FEE = 10;
+        
+        let selectedAmount = 0;
+        let userEmail = '';
+        let userBalance = 0;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            userBalance = parseFloat(localStorage.getItem('userBalance')) || 0;
+            userEmail = localStorage.getItem('userEmail') || '';
+            document.getElementById('balanceDisplay').textContent = `₦${userBalance.toLocaleString()}.00`;
+        });
+
+        function selectAmount(amount) {
+            selectedAmount = amount;
+            document.getElementById('customAmount').value = amount;
+            updateUI();
+            
+            document.querySelectorAll('.amount-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            event.target.classList.add('selected');
+        }
+
+        function updateAmount() {
+            const customAmount = document.getElementById('customAmount').value;
+            if (customAmount && customAmount >= 100) {
+                selectedAmount = parseInt(customAmount);
+                updateUI();
+                
+                document.querySelectorAll('.amount-btn').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+            } else if (customAmount === '') {
+                document.getElementById('feeSummary').style.display = 'none';
+                document.getElementById('fundBtn').disabled = true;
+                document.getElementById('fundBtn').textContent = 'Select amount';
+                selectedAmount = 0;
+            }
+        }
+
+        function updateUI() {
+            if (selectedAmount >= 100) {
+                const total = selectedAmount + SERVICE_FEE;
+                const receive = selectedAmount;
+                
+                document.getElementById('displayAmount').textContent = `₦${selectedAmount.toLocaleString()}`;
+                document.getElementById('displayFee').textContent = `₦${SERVICE_FEE}`;
+                document.getElementById('displayTotal').textContent = `₦${total.toLocaleString()}`;
+                document.getElementById('displayReceive').textContent = `₦${receive.toLocaleString()}`;
+                document.getElementById('feeSummary').style.display = 'block';
+                document.getElementById('fundBtn').disabled = false;
+                document.getElementById('fundBtn').textContent = `Pay ₦${total.toLocaleString()}`;
+            }
+        }
+
+        async function processPayment() {
+            if (!selectedAmount || selectedAmount < 100) {
+                alert('Please select or enter a valid amount (minimum ₦100)');
+                return;
+            }
+            
+            const totalAmount = selectedAmount + SERVICE_FEE;
+            
+            if (!window.PaystackPop) {
+                await loadScript('https://js.paystack.co/v1/inline.js');
+            }
+
+            const handler = PaystackPop.setup({
+                key: PAYSTACK_PUBLIC_KEY,
+                email: userEmail,
+                amount: totalAmount * 100,
+                currency: 'NGN',
+                ref: 'TUNZY_' + Date.now(),
+                callback: function(response) {
+                    // Payment successful - add ONLY the selected amount to wallet (not the fee)
+                    userBalance += selectedAmount;
+                    localStorage.setItem('userBalance', userBalance);
+                    
+                    const transaction = {
+                        type: 'Wallet Funding',
+                        amount: `+₦${selectedAmount.toLocaleString()}`,
+                        fee: `-₦${SERVICE_FEE}`,
+                        total_paid: `₦${totalAmount.toLocaleString()}`,
+                        date: new Date().toLocaleString()
+                    };
+                    
+                    let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+                    transactions.unshift(transaction);
+                    localStorage.setItem('transactions', JSON.stringify(transactions.slice(0, 20)));
+                    
+                    alert(`✅ Wallet funded with ₦${selectedAmount.toLocaleString()}!\n\nFee: ₦${SERVICE_FEE}\nTotal paid: ₦${totalAmount.toLocaleString()}`);
+                    window.location.href = 'dashboard.html';
+                },
+                onClose: function() {
+                    alert('Payment cancelled');
+                }
+            });
+            
+            handler.openIframe();
+        }
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+    </script>
+</body>
+</html>
